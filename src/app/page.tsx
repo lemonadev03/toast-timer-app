@@ -201,10 +201,13 @@ export default function Home() {
   const [initialDuration, setInitialDuration] = useState(DEFAULT_DURATION_SECONDS);
   const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION_SECONDS);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [shouldHideOnResume, setShouldHideOnResume] = useState(false);
   const [minutesInput, setMinutesInput] = useState("2");
   const [secondsInput, setSecondsInput] = useState("0");
   const [inputError, setInputError] = useState<string | null>(null);
   const [isTimerHidden, setIsTimerHidden] = useState(false);
+  const [hideOnStart, setHideOnStart] = useState(true);
   const [segments, setSegments] = useState<StageConfig[]>(DEFAULT_SEGMENTS);
   const [overtime, setOvertime] = useState<OvertimeConfig>(DEFAULT_OVERTIME);
 
@@ -230,12 +233,35 @@ export default function Home() {
   const formatted = useMemo(() => formatTime(timeLeft), [timeLeft]);
   const overtimeTheme = COLOR_PRESETS[overtime.color];
 
-  const handleToggle = () => {
-    setIsRunning((prev) => !prev);
+  const startSession = () => {
+    setIsSessionActive(true);
+    setShouldHideOnResume(false);
+    setIsRunning(true);
+    setIsTimerHidden(hideOnStart);
+  };
+
+  const toggleRunState = () => {
+    setIsRunning((prev) => {
+      if (prev) {
+        setShouldHideOnResume(isTimerHidden);
+        if (isTimerHidden) {
+          setIsTimerHidden(false);
+        }
+        return false;
+      }
+
+      if (shouldHideOnResume) {
+        setIsTimerHidden(true);
+      }
+      setShouldHideOnResume(false);
+      return true;
+    });
   };
 
   const handleReset = () => {
     setIsRunning(false);
+    setIsSessionActive(false);
+    setShouldHideOnResume(false);
     setTimeLeft(initialDuration);
     setIsTimerHidden(false);
   };
@@ -265,6 +291,8 @@ export default function Home() {
     setInitialDuration(totalSeconds);
     setTimeLeft(totalSeconds);
     setIsRunning(false);
+    setIsSessionActive(false);
+    setShouldHideOnResume(false);
     setIsTimerHidden(false);
   };
 
@@ -352,43 +380,9 @@ export default function Home() {
     >
       <div className="pointer-events-none absolute inset-0 opacity-10 [mask-image:radial-gradient(circle_at_center,black,transparent)]" />
 
-      <div
-        className={cn(
-          "relative z-[1] flex w-full max-w-6xl gap-8 transition-all duration-500",
-          isRunning ? "flex-col items-center" : "flex-col items-center lg:flex-row lg:items-stretch lg:justify-center",
-        )}
-      >
-        <section className="relative flex flex-1 min-w-[300px] flex-col gap-4 rounded-3xl border border-white/25 bg-black/20 p-8 text-center lg:flex-[1.4] lg:min-w-[420px] lg:p-12">
-          <div className="absolute left-5 top-5 flex flex-col gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              className="bg-black/60 text-white hover:bg-black/70"
-              onClick={handleReset}
-            >
-              Reset
-            </Button>
-            {!isTimerHidden && (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="bg-black/60 text-white hover:bg-black/70"
-                onClick={handleToggle}
-              >
-                {isRunning ? "Pause" : "Start"}
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="secondary"
-              className="bg-black/60 text-white hover:bg-black/70"
-              onClick={() => setIsTimerHidden((prev) => !prev)}
-            >
-              {isTimerHidden ? "Show" : "Hide"}
-            </Button>
-          </div>
-
-          <div className="flex flex-1 items-center justify-center">
+      {isSessionActive ? (
+        <div className="relative z-[1] flex w-full flex-1 items-center justify-center py-16">
+          <div className="flex w-full items-center justify-center">
             {!isTimerHidden && (
               <span
                 className={cn(
@@ -402,46 +396,76 @@ export default function Home() {
             )}
           </div>
 
-          {!isRunning && !isTimerHidden && (
-            <form
-              onSubmit={handleKeySubmit}
-              className="grid w-full gap-4 rounded-2xl border border-white/25 bg-white/10 p-6 text-left backdrop-blur-sm sm:grid-cols-[repeat(3,minmax(0,1fr))]"
+          <div className="fixed bottom-8 left-8 z-[2] flex flex-col gap-3">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-black/60 text-white hover:bg-black/70"
+              onClick={() => setIsTimerHidden((prev) => !prev)}
             >
-              <label className="flex flex-col gap-2 text-sm font-semibold">
-                Minutes
-                <Input
-                  inputMode="numeric"
-                  pattern="\\d*"
-                  value={minutesInput}
-                  onChange={(event) => setMinutesInput(event.target.value.replace(/[^0-9]/g, ""))}
-                  placeholder="2"
-                  className="bg-white/80 text-slate-950 placeholder:text-slate-500"
-                />
-              </label>
-              <label className="flex flex-col gap-2 text-sm font-semibold">
-                Seconds
-                <Input
-                  inputMode="numeric"
-                  pattern="\\d*"
-                  value={secondsInput}
-                  onChange={(event) => setSecondsInput(event.target.value.replace(/[^0-9]/g, ""))}
-                  placeholder="0"
-                  className="bg-white/80 text-slate-950 placeholder:text-slate-500"
-                />
-              </label>
-              <div className="flex items-end">
-                <Button type="submit" className="w-full" variant="secondary">
-                  Apply
+              {isTimerHidden ? "Show" : "Hide"}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-black/60 text-white hover:bg-black/70"
+              onClick={toggleRunState}
+            >
+              {isRunning ? "Pause" : "Resume"}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-black/60 text-white hover:bg-black/70"
+              onClick={handleReset}
+            >
+              Reset
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative z-[1] flex w-full max-w-6xl flex-col items-center gap-8 transition-all duration-500 lg:flex-row lg:items-stretch lg:justify-center">
+          <section className="relative flex flex-1 min-w-[300px] flex-col gap-6 overflow-hidden rounded-3xl border border-white/25 bg-black/15 p-8 text-center lg:flex-[1.4] lg:min-w-[420px] lg:p-12">
+            <div className="flex flex-1 items-center justify-center">
+              {!isTimerHidden && (
+                <span
+                  className={cn(
+                    "font-mono font-semibold leading-none",
+                    "text-[clamp(4rem,16vw,14rem)]",
+                    palette.theme.timer,
+                  )}
+                >
+                  {formatted}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col items-center gap-4">
+              <div className="flex items-center gap-3">
+                <Button size="lg" className="px-10" variant="secondary" onClick={startSession}>
+                  Start
+                </Button>
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="px-6"
+                  onClick={handleReset}
+                >
+                  Reset
                 </Button>
               </div>
-              {inputError && (
-                <p className="col-span-full text-sm font-medium text-destructive">{inputError}</p>
-              )}
-            </form>
-          )}
-        </section>
+              <label className="flex items-center gap-2 text-sm font-medium text-white/90">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-white"
+                  checked={hideOnStart}
+                  onChange={(event) => setHideOnStart(event.target.checked)}
+                />
+                Hide timer on start
+              </label>
+            </div>
+          </section>
 
-        {!isRunning && (
           <section className="w-full max-w-xl flex-1 rounded-3xl border border-white/35 bg-white/90 p-7 text-left text-slate-900 shadow-2xl backdrop-blur-md">
             <div className="flex h-full flex-col gap-5">
               <header className="flex flex-col gap-2">
@@ -511,66 +535,68 @@ export default function Home() {
                           <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Time left</span>
                           <span>{rangeLabel}</span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <span>Threshold</span>
-                          <div className="flex items-center gap-2 text-xs font-normal normal-case text-slate-600">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={Math.floor(segment.minSeconds / 60)}
-                              disabled={isBaseStage}
-                              onChange={(event) => updateSegmentMinutes(segment.id, event.target.value)}
-                              className="h-9 w-16 text-sm disabled:cursor-not-allowed"
-                            />
-                            <span className="text-xs font-medium text-slate-500">min</span>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={59}
-                              value={segment.minSeconds % 60}
-                              disabled={isBaseStage}
-                              onChange={(event) => updateSegmentSeconds(segment.id, event.target.value)}
-                              className="h-9 w-16 text-sm disabled:cursor-not-allowed"
-                            />
-                            <span className="text-xs font-medium text-slate-500">sec</span>
+                        <div className="flex flex-1 flex-wrap items-center gap-4">
+                          <div className="flex flex-col gap-1 text-sm font-medium uppercase tracking-wide text-slate-500">
+                            <span>Threshold</span>
+                            <div className="flex items-center gap-2 text-xs font-normal normal-case text-slate-600">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={Math.floor(segment.minSeconds / 60)}
+                                disabled={isBaseStage}
+                                onChange={(event) => updateSegmentMinutes(segment.id, event.target.value)}
+                                className="h-9 w-16 text-sm disabled:cursor-not-allowed"
+                              />
+                              <span className="text-xs font-medium text-slate-500">min</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                max={59}
+                                value={segment.minSeconds % 60}
+                                disabled={isBaseStage}
+                                onChange={(event) => updateSegmentSeconds(segment.id, event.target.value)}
+                                className="h-9 w-16 text-sm disabled:cursor-not-allowed"
+                              />
+                              <span className="text-xs font-medium text-slate-500">sec</span>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Colour</span>
-                          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap rounded-full bg-white/85 px-2 py-1 shadow-inner">
-                            {COLOR_OPTIONS.map((option) => {
-                              const isSelected = option.key === segment.color;
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Colour</span>
+                            <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap rounded-full bg-white/85 px-2 py-1 shadow-inner">
+                              {COLOR_OPTIONS.map((option) => {
+                                const isSelected = option.key === segment.color;
 
-                              return (
-                                <button
-                                  key={option.key}
-                                  type="button"
-                                  onClick={() => updateSegment(segment.id, { color: option.key })}
-                                  className={cn(
-                                    "size-8 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-                                    option.swatch,
-                                    option.ring,
-                                    isSelected
-                                      ? "border-black/70 ring-offset-white"
-                                      : "border-white/70 opacity-80 hover:opacity-100",
-                                  )}
-                                  aria-label={`Use ${option.name} palette`}
-                                />
-                              );
-                            })}
+                                return (
+                                  <button
+                                    key={option.key}
+                                    type="button"
+                                    onClick={() => updateSegment(segment.id, { color: option.key })}
+                                    className={cn(
+                                      "size-8 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                                      option.swatch,
+                                      option.ring,
+                                      isSelected
+                                        ? "border-black/70 ring-offset-white"
+                                        : "border-white/70 opacity-80 hover:opacity-100",
+                                    )}
+                                    aria-label={`Use ${option.name} palette`}
+                                  />
+                                );
+                              })}
+                            </div>
                           </div>
+                          {!isBaseStage && sortedSegments.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeSegment(segment.id)}
+                              className="ml-auto text-slate-500 hover:text-red-500"
+                            >
+                              Remove
+                            </Button>
+                          )}
                         </div>
-                        {!isBaseStage && sortedSegments.length > 1 && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeSegment(segment.id)}
-                            className="ml-auto text-slate-500 hover:text-red-500"
-                          >
-                            Remove
-                          </Button>
-                        )}
                       </div>
                     );
                   })}
@@ -619,8 +645,8 @@ export default function Home() {
               </div>
             </div>
           </section>
-        )}
-      </div>
+        </div>
+      )}
     </main>
   );
 }
