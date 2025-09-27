@@ -780,8 +780,6 @@ export default function Home() {
                     const isPickerOpen = openColorPickerId === segment.id;
                     const thresholdMinutes = Math.floor(segment.minSeconds / 60);
                     const thresholdSeconds = segment.minSeconds % 60;
-                    const displayMinutes = String(thresholdMinutes).padStart(2, "0");
-                    const displaySeconds = String(thresholdSeconds).padStart(2, "0");
 
                     return (
                       <div
@@ -797,12 +795,7 @@ export default function Home() {
                             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
                               Time left
                             </span>
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <span>{rangeLabel}</span>
-                              <span className="text-xs font-medium text-slate-500">
-                                {displayMinutes}m {displaySeconds}s
-                              </span>
-                            </div>
+                            <span>{rangeLabel}</span>
                           </div>
                           <div className="flex flex-wrap items-center gap-3">
                             <Input
@@ -827,7 +820,7 @@ export default function Home() {
                           </div>
                         </div>
 
-                        <div className="relative flex flex-col items-center gap-2 sm:ml-4 sm:items-end">
+                        <div className="relative flex w-[5.5rem] flex-col items-center gap-2 sm:ml-4 sm:items-end">
                           <button
                             id={`color-picker-trigger-${segment.id}`}
                             type="button"
@@ -835,7 +828,7 @@ export default function Home() {
                               setOpenColorPickerId((prev) => (prev === segment.id ? null : segment.id))
                             }
                             className={cn(
-                              "h-16 w-16 rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:h-20 sm:w-20",
+                              "h-12 w-full rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:h-[50px]",
                               segmentTheme.swatch,
                               isPickerOpen
                                 ? "ring-2 ring-slate-400 ring-offset-2 ring-offset-white"
@@ -880,32 +873,30 @@ export default function Home() {
                               </div>
                             </div>
                           )}
-                          <div className="mt-2 flex gap-2 sm:mt-3">
+                          <div className="mt-1 grid w-full grid-cols-2 gap-1 sm:mt-2">
                             <Button
                               type="button"
                               variant="outline"
-                              size="icon"
                               onClick={() => addStageBelow(segment.id)}
                               aria-label="Add stage below"
                               title="Add stage below"
-                              className="rounded-xl border-slate-300 bg-white/80 text-slate-600 hover:bg-white"
+                              className="h-10 w-full justify-center rounded-xl border border-blue-300 bg-blue-500/15 px-0 text-blue-600 shadow-sm transition-colors hover:bg-blue-500/25 focus-visible:ring-2 focus-visible:ring-blue-300"
                             >
-                              <PlusSquare className="size-5" />
+                              <PlusSquare className="h-5 w-5" />
                             </Button>
                             {!isBaseStage && sortedSegments.length > 1 && (
                               <Button
                                 type="button"
                                 variant="destructive"
-                                size="icon"
                                 onClick={() => {
                                   setPendingDeleteStageId(segment.id);
                                   setOpenColorPickerId((prev) => (prev === segment.id ? null : prev));
                                 }}
                                 aria-label="Remove this stage"
                                 title="Remove this stage"
-                                className="rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
+                                className="h-10 w-full justify-center rounded-xl bg-red-500 px-0 text-white shadow-sm hover:bg-red-600"
                               >
-                                <Trash2 className="size-5" />
+                                <Trash2 className="h-5 w-5" />
                               </Button>
                             )}
                           </div>
@@ -929,7 +920,7 @@ export default function Home() {
                       />
                     </div>
 
-                    <div className="relative flex flex-col items-center gap-2 sm:ml-4 sm:items-end">
+                    <div className="relative flex w-[5.5rem] flex-col items-center gap-2 sm:ml-4 sm:items-end">
                       <button
                         id="color-picker-trigger-overtime"
                         type="button"
@@ -937,7 +928,7 @@ export default function Home() {
                           setOpenColorPickerId((prev) => (prev === "overtime" ? null : "overtime"))
                         }
                         className={cn(
-                          "h-16 w-16 rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:h-20 sm:w-20",
+                          "h-12 w-full rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:h-[50px]",
                           overtimeTheme.swatch,
                           openColorPickerId === "overtime"
                             ? "ring-2 ring-slate-400 ring-offset-2 ring-offset-white"
@@ -984,6 +975,7 @@ export default function Home() {
                         </div>
                       )}
                     </div>
+
                   </div>
                 </div>
               </div>
