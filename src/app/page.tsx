@@ -787,195 +787,202 @@ export default function Home() {
                       <div
                         key={segment.id}
                         className={cn(
-                          "relative flex flex-col gap-3 rounded-2xl border px-4 py-3 shadow-sm",
+                          "relative flex flex-col gap-4 rounded-2xl border p-4 shadow-sm sm:flex-row sm:items-start",
                           segmentTheme.rowBg,
                           segmentTheme.rowBorder,
                         )}
                       >
-                        <button
-                          id={`color-picker-trigger-${segment.id}`}
-                          type="button"
-                          onClick={() =>
-                            setOpenColorPickerId((prev) => (prev === segment.id ? null : segment.id))
-                          }
-                          className={cn(
-                            "absolute right-4 top-3 h-14 w-14 rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-                            segmentTheme.swatch,
-                            isPickerOpen ? "ring-2 ring-slate-400 ring-offset-2 ring-offset-white" : "hover:scale-[1.02]",
-                          )}
-                          aria-label={`Change ${segmentTheme.name} stage colour`}
-                          aria-haspopup="dialog"
-                          aria-expanded={isPickerOpen}
-                        />
-
-                        {isPickerOpen && (
-                          <div
-                            id={`color-picker-${segment.id}`}
-                            className="absolute right-4 top-[4.75rem] z-20 flex min-w-[9rem] flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur"
-                          >
-                            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              Stage colour
-                            </span>
-                            <div className="grid grid-cols-3 gap-2">
-                              {COLOR_OPTIONS.map((option) => {
-                                const isSelected = option.key === segment.color;
-
-                                return (
-                                  <button
-                                    key={option.key}
-                                    type="button"
-                                    onClick={() => {
-                                      updateSegment(segment.id, { color: option.key });
-                                      setOpenColorPickerId(null);
-                                    }}
-                                    className={cn(
-                                      "h-9 w-9 rounded-xl border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-                                      option.swatch,
-                                      option.ring,
-                                      isSelected
-                                        ? "border-slate-900"
-                                        : "border-white/70 opacity-85 hover:opacity-100",
-                                    )}
-                                    aria-label={`Use ${option.name} palette`}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        <div className="flex items-center justify-between pr-32 text-sm font-medium text-slate-900">
-                          <div className="flex flex-col">
+                        <div className="flex flex-1 flex-col gap-3 text-sm font-medium text-slate-900">
+                          <div className="flex flex-col gap-1">
                             <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
                               Time left
                             </span>
-                            <span className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-baseline gap-2">
                               <span>{rangeLabel}</span>
                               <span className="text-xs font-medium text-slate-500">
                                 {displayMinutes}m {displaySeconds}s
                               </span>
-                            </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={thresholdMinutes}
+                              disabled={isBaseStage}
+                              onChange={(event) => updateSegmentMinutes(segment.id, event.target.value)}
+                              className="h-9 w-16 text-sm disabled:cursor-not-allowed"
+                            />
+                            <span className="text-xs font-medium text-slate-500">min</span>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={59}
+                              value={thresholdSeconds}
+                              disabled={isBaseStage}
+                              onChange={(event) => updateSegmentSeconds(segment.id, event.target.value)}
+                              className="h-9 w-16 text-sm disabled:cursor-not-allowed"
+                            />
+                            <span className="text-xs font-medium text-slate-500">sec</span>
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 pr-32">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={thresholdMinutes}
-                            disabled={isBaseStage}
-                            onChange={(event) => updateSegmentMinutes(segment.id, event.target.value)}
-                            className="h-9 w-16 text-sm disabled:cursor-not-allowed"
-                          />
-                          <span className="text-xs font-medium text-slate-500">min</span>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={59}
-                            value={thresholdSeconds}
-                            disabled={isBaseStage}
-                            onChange={(event) => updateSegmentSeconds(segment.id, event.target.value)}
-                            className="h-9 w-16 text-sm disabled:cursor-not-allowed"
-                          />
-                          <span className="text-xs font-medium text-slate-500">sec</span>
-                          <Button
+
+                        <div className="relative flex flex-col items-center gap-2 sm:ml-4 sm:items-end">
+                          <button
+                            id={`color-picker-trigger-${segment.id}`}
                             type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => addStageBelow(segment.id)}
-                            aria-label="Add stage below"
-                            title="Add stage below"
-                            className="ml-auto rounded-xl border-slate-300 bg-white/80 text-slate-600 hover:bg-white"
-                          >
-                            <PlusSquare className="size-5" />
-                          </Button>
-                          {!isBaseStage && sortedSegments.length > 1 && (
+                            onClick={() =>
+                              setOpenColorPickerId((prev) => (prev === segment.id ? null : segment.id))
+                            }
+                            className={cn(
+                              "h-16 w-16 rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:h-20 sm:w-20",
+                              segmentTheme.swatch,
+                              isPickerOpen
+                                ? "ring-2 ring-slate-400 ring-offset-2 ring-offset-white"
+                                : "hover:scale-[1.02]",
+                            )}
+                            aria-label={`Change ${segmentTheme.name} stage colour`}
+                            aria-haspopup="dialog"
+                            aria-expanded={isPickerOpen}
+                          />
+                          {isPickerOpen && (
+                            <div
+                              id={`color-picker-${segment.id}`}
+                              className="absolute left-1/2 top-full z-20 mt-3 flex min-w-[9rem] -translate-x-1/2 flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:left-auto sm:right-0 sm:translate-x-0"
+                            >
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                Stage colour
+                              </span>
+                              <div className="grid grid-cols-3 gap-2">
+                                {COLOR_OPTIONS.map((option) => {
+                                  const isSelected = option.key === segment.color;
+
+                                  return (
+                                    <button
+                                      key={option.key}
+                                      type="button"
+                                      onClick={() => {
+                                        updateSegment(segment.id, { color: option.key });
+                                        setOpenColorPickerId(null);
+                                      }}
+                                      className={cn(
+                                        "h-9 w-9 rounded-xl border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+                                        option.swatch,
+                                        option.ring,
+                                        isSelected
+                                          ? "border-slate-900"
+                                          : "border-white/70 opacity-85 hover:opacity-100",
+                                      )}
+                                      aria-label={`Use ${option.name} palette`}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                          <div className="mt-2 flex gap-2 sm:mt-3">
                             <Button
                               type="button"
-                              variant="destructive"
+                              variant="outline"
                               size="icon"
-                              onClick={() => {
-                                setPendingDeleteStageId(segment.id);
-                                setOpenColorPickerId((prev) => (prev === segment.id ? null : prev));
-                              }}
-                              aria-label="Remove this stage"
-                              title="Remove this stage"
-                              className="rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
+                              onClick={() => addStageBelow(segment.id)}
+                              aria-label="Add stage below"
+                              title="Add stage below"
+                              className="rounded-xl border-slate-300 bg-white/80 text-slate-600 hover:bg-white"
                             >
-                              <Trash2 className="size-5" />
+                              <PlusSquare className="size-5" />
                             </Button>
-                          )}
+                            {!isBaseStage && sortedSegments.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => {
+                                  setPendingDeleteStageId(segment.id);
+                                  setOpenColorPickerId((prev) => (prev === segment.id ? null : prev));
+                                }}
+                                aria-label="Remove this stage"
+                                title="Remove this stage"
+                                className="rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
+                              >
+                                <Trash2 className="size-5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                   <div
                     className={cn(
-                      "relative flex flex-col gap-3 rounded-2xl border px-4 py-3 shadow-sm",
+                      "relative flex flex-col gap-4 rounded-2xl border p-4 shadow-sm sm:flex-row sm:items-start",
                       overtimeTheme.rowBg,
                       overtimeTheme.rowBorder,
                     )}
                   >
-                    <button
-                      id="color-picker-trigger-overtime"
-                      type="button"
-                      onClick={() =>
-                        setOpenColorPickerId((prev) => (prev === "overtime" ? null : "overtime"))
-                      }
-                      className={cn(
-                        "absolute right-4 top-3 h-14 w-14 rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-                        overtimeTheme.swatch,
-                        openColorPickerId === "overtime"
-                          ? "ring-2 ring-slate-400 ring-offset-2 ring-offset-white"
-                          : "hover:scale-[1.02]",
-                      )}
-                      aria-label="Change overtime colour"
-                      aria-haspopup="dialog"
-                      aria-expanded={openColorPickerId === "overtime"}
-                    />
-
-                    {openColorPickerId === "overtime" && (
-                      <div
-                        id="color-picker-overtime"
-                        className="absolute right-4 top-[4.75rem] z-20 flex min-w-[9rem] flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur"
-                      >
-                        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Overtime colour
-                        </span>
-                        <div className="grid grid-cols-3 gap-2">
-                          {COLOR_OPTIONS.map((option) => {
-                            const isSelected = option.key === overtime.color;
-
-                            return (
-                              <button
-                                key={option.key}
-                                type="button"
-                                onClick={() => {
-                                  setOvertime((prev) => ({ ...prev, color: option.key }));
-                                  setOpenColorPickerId(null);
-                                }}
-                                className={cn(
-                                  "h-9 w-9 rounded-xl border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
-                                  option.swatch,
-                                  option.ring,
-                                  isSelected
-                                    ? "border-slate-900"
-                                    : "border-white/70 opacity-85 hover:opacity-100",
-                                )}
-                                aria-label={`Use ${option.name} palette`}
-                              />
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 pr-32 text-sm font-medium text-slate-900">
+                    <div className="flex flex-1 flex-col gap-2 text-sm font-medium text-slate-900">
                       <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overtime</span>
                       <Input
                         value={overtime.label}
                         onChange={(event) => setOvertime((prev) => ({ ...prev, label: event.target.value }))}
-                        className="h-9 w-40 text-sm"
+                        className="h-9 w-full max-w-xs text-sm"
                       />
+                    </div>
+
+                    <div className="relative flex flex-col items-center gap-2 sm:ml-4 sm:items-end">
+                      <button
+                        id="color-picker-trigger-overtime"
+                        type="button"
+                        onClick={() =>
+                          setOpenColorPickerId((prev) => (prev === "overtime" ? null : "overtime"))
+                        }
+                        className={cn(
+                          "h-16 w-16 rounded-2xl border-2 border-white/70 shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white sm:h-20 sm:w-20",
+                          overtimeTheme.swatch,
+                          openColorPickerId === "overtime"
+                            ? "ring-2 ring-slate-400 ring-offset-2 ring-offset-white"
+                            : "hover:scale-[1.02]",
+                        )}
+                        aria-label="Change overtime colour"
+                        aria-haspopup="dialog"
+                        aria-expanded={openColorPickerId === "overtime"}
+                      />
+
+                      {openColorPickerId === "overtime" && (
+                        <div
+                          id="color-picker-overtime"
+                          className="absolute left-1/2 top-full z-20 mt-3 flex min-w-[9rem] -translate-x-1/2 flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:left-auto sm:right-0 sm:translate-x-0"
+                        >
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Overtime colour
+                          </span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {COLOR_OPTIONS.map((option) => {
+                              const isSelected = option.key === overtime.color;
+
+                              return (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setOvertime((prev) => ({ ...prev, color: option.key }));
+                                    setOpenColorPickerId(null);
+                                  }}
+                                  className={cn(
+                                    "h-9 w-9 rounded-xl border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+                                    option.swatch,
+                                    option.ring,
+                                    isSelected
+                                      ? "border-slate-900"
+                                      : "border-white/70 opacity-85 hover:opacity-100",
+                                  )}
+                                  aria-label={`Use ${option.name} palette`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
