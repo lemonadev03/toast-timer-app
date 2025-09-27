@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,6 +134,8 @@ const DEFAULT_OVERTIME: OvertimeConfig = {
   color: "red",
 };
 
+const CONFIG_STORAGE_KEY = "timer-config";
+
 const SORT_SEGMENTS = (segments: StageConfig[]) =>
   [...segments].sort((a, b) => b.minSeconds - a.minSeconds);
 
@@ -203,6 +205,7 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [shouldHideOnResume, setShouldHideOnResume] = useState(false);
+  const [areControlsDimmed, setAreControlsDimmed] = useState(false);
   const [minutesInput, setMinutesInput] = useState("2");
   const [secondsInput, setSecondsInput] = useState("0");
   const [inputError, setInputError] = useState<string | null>(null);
@@ -210,6 +213,47 @@ export default function Home() {
   const [hideOnStart, setHideOnStart] = useState(true);
   const [segments, setSegments] = useState<StageConfig[]>(DEFAULT_SEGMENTS);
   const [overtime, setOvertime] = useState<OvertimeConfig>(DEFAULT_OVERTIME);
+  const dimTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const stored = window.localStorage.getItem(CONFIG_STORAGE_KEY);
+    if (!stored) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(stored) as { minutes?: number; seconds?: number };
+      const minutesValue = Number(parsed.minutes);
+      const secondsValue = Number(parsed.seconds);
+
+      if (Number.isNaN(minutesValue) || minutesValue < 0) {
+        return;
+      }
+
+      if (Number.isNaN(secondsValue) || secondsValue < 0 || secondsValue > 59) {
+        return;
+      }
+
+      const minutes = Math.floor(minutesValue);
+      const seconds = Math.floor(secondsValue);
+      const totalSeconds = minutes * 60 + seconds;
+
+      if (totalSeconds <= 0) {
+        return;
+      }
+
+      setMinutesInput(String(minutes));
+      setSecondsInput(String(seconds));
+      setInitialDuration(totalSeconds);
+      setTimeLeft(totalSeconds);
+    } catch (error) {
+      console.error("Failed to parse stored timer configuration", error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isRunning) {
@@ -233,9 +277,59 @@ export default function Home() {
   const formatted = useMemo(() => formatTime(timeLeft), [timeLeft]);
   const overtimeTheme = COLOR_PRESETS[overtime.color];
 
+  const resetDimControls = useCallback(() => {
+    if (!isSessionActive || !isRunning) {
+      setAreControlsDimmed(false);
+      if (dimTimeoutRef.current !== null) {
+        window.clearTimeout(dimTimeoutRef.current);
+        dimTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    setAreControlsDimmed(false);
+    if (dimTimeoutRef.current !== null) {
+      window.clearTimeout(dimTimeoutRef.current);
+    }
+
+    dimTimeoutRef.current = window.setTimeout(() => {
+      setAreControlsDimmed(true);
+    }, 3000);
+  }, [isRunning, isSessionActive]);
+
+  useEffect(() => {
+    if (!isSessionActive || !isRunning) {
+      setAreControlsDimmed(false);
+      if (dimTimeoutRef.current !== null) {
+        window.clearTimeout(dimTimeoutRef.current);
+        dimTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    resetDimControls();
+
+    const handlePointerActivity = () => {
+      resetDimControls();
+    };
+
+    window.addEventListener("mousemove", handlePointerActivity, { passive: true });
+    window.addEventListener("touchstart", handlePointerActivity, { passive: true });
+
+    return () => {
+      if (dimTimeoutRef.current !== null) {
+        window.clearTimeout(dimTimeoutRef.current);
+        dimTimeoutRef.current = null;
+      }
+      window.removeEventListener("mousemove", handlePointerActivity);
+      window.removeEventListener("touchstart", handlePointerActivity);
+    };
+  }, [isRunning, isSessionActive, resetDimControls]);
+
   const startSession = () => {
     setIsSessionActive(true);
     setShouldHideOnResume(false);
+    setAreControlsDimmed(false);
     setIsRunning(true);
     setIsTimerHidden(hideOnStart);
   };
@@ -247,6 +341,11 @@ export default function Home() {
         if (isTimerHidden) {
           setIsTimerHidden(false);
         }
+        if (dimTimeoutRef.current !== null) {
+          window.clearTimeout(dimTimeoutRef.current);
+          dimTimeoutRef.current = null;
+        }
+        setAreControlsDimmed(false);
         return false;
       }
 
@@ -254,6 +353,11 @@ export default function Home() {
         setIsTimerHidden(true);
       }
       setShouldHideOnResume(false);
+      setAreControlsDimmed(false);
+      if (dimTimeoutRef.current !== null) {
+        window.clearTimeout(dimTimeoutRef.current);
+        dimTimeoutRef.current = null;
+      }
       return true;
     });
   };
@@ -262,8 +366,13 @@ export default function Home() {
     setIsRunning(false);
     setIsSessionActive(false);
     setShouldHideOnResume(false);
+    setAreControlsDimmed(false);
     setTimeLeft(initialDuration);
     setIsTimerHidden(false);
+    if (dimTimeoutRef.current !== null) {
+      window.clearTimeout(dimTimeoutRef.current);
+      dimTimeoutRef.current = null;
+    }
   };
 
   const handleApplyDuration = () => {
@@ -293,7 +402,19 @@ export default function Home() {
     setIsRunning(false);
     setIsSessionActive(false);
     setShouldHideOnResume(false);
+    setAreControlsDimmed(false);
     setIsTimerHidden(false);
+    if (dimTimeoutRef.current !== null) {
+      window.clearTimeout(dimTimeoutRef.current);
+      dimTimeoutRef.current = null;
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        CONFIG_STORAGE_KEY,
+        JSON.stringify({ minutes, seconds }),
+      );
+    }
   };
 
   const handleKeySubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -386,7 +507,7 @@ export default function Home() {
             {!isTimerHidden && (
               <span
                 className={cn(
-                  "font-mono font-semibold leading-none",
+                  "font-mono font-semibold leading-none animate-fade-in-scale",
                   "text-[clamp(4rem,16vw,14rem)]",
                   palette.theme.timer,
                 )}
@@ -396,11 +517,16 @@ export default function Home() {
             )}
           </div>
 
-          <div className="fixed bottom-8 left-8 z-[2] flex flex-col gap-3">
+          <div
+            className={cn(
+              "fixed bottom-8 left-8 z-[2] flex items-center gap-3 rounded-full border border-white/25 bg-black/30 px-4 py-3 shadow-lg backdrop-blur-sm transition-opacity duration-300",
+              areControlsDimmed ? "opacity-25 animate-fade-out-soft" : "opacity-100 animate-fade-in-soft",
+            )}
+          >
             <Button
               size="sm"
               variant="secondary"
-              className="bg-black/60 text-white hover:bg-black/70"
+              className="transform bg-black/60 text-white transition-transform transition-colors duration-300 hover:-translate-y-1 hover:bg-black/80 focus-visible:-translate-y-1"
               onClick={() => setIsTimerHidden((prev) => !prev)}
             >
               {isTimerHidden ? "Show" : "Hide"}
@@ -408,7 +534,7 @@ export default function Home() {
             <Button
               size="sm"
               variant="secondary"
-              className="bg-black/60 text-white hover:bg-black/70"
+              className="transform bg-black/60 text-white transition-transform transition-colors duration-300 hover:-translate-y-1 hover:bg-black/80 focus-visible:-translate-y-1"
               onClick={toggleRunState}
             >
               {isRunning ? "Pause" : "Resume"}
@@ -416,7 +542,7 @@ export default function Home() {
             <Button
               size="sm"
               variant="secondary"
-              className="bg-black/60 text-white hover:bg-black/70"
+              className="transform border-2 border-red-400 bg-red-500/10 text-red-50 transition-transform transition-colors duration-300 hover:-translate-y-1 hover:bg-red-500/20 focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-red-300"
               onClick={handleReset}
             >
               Reset
@@ -430,7 +556,7 @@ export default function Home() {
               {!isTimerHidden && (
                 <span
                   className={cn(
-                    "font-mono font-semibold leading-none",
+                    "font-mono font-semibold leading-none animate-fade-in-scale",
                     "text-[clamp(4rem,16vw,14rem)]",
                     palette.theme.timer,
                   )}
@@ -440,30 +566,32 @@ export default function Home() {
               )}
             </div>
 
-            <div className="flex flex-col items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Button size="lg" className="px-10" variant="secondary" onClick={startSession}>
-                  Start
-                </Button>
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  className="px-6"
-                  onClick={handleReset}
-                >
-                  Reset
-                </Button>
-              </div>
-              <label className="flex items-center gap-2 text-sm font-medium text-white/90">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-white"
-                  checked={hideOnStart}
-                  onChange={(event) => setHideOnStart(event.target.checked)}
-                />
-                Hide timer on start
-              </label>
+            <div className="flex w-full flex-col items-center gap-4 md:flex-row md:items-center md:justify-center md:gap-6">
+              <Button
+                size="lg"
+                onClick={startSession}
+                className="order-1 h-14 w-full max-w-sm transform rounded-full border-2 border-blue-400 bg-blue-500/20 text-lg font-semibold text-blue-50 shadow-lg transition-transform transition-colors duration-300 hover:-translate-y-1 hover:bg-blue-500/30 focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-blue-300 animate-fade-in-scale"
+              >
+                Start
+              </Button>
+              <Button
+                size="lg"
+                variant="secondary"
+                className="order-2 h-14 transform rounded-full border-2 border-red-400 bg-red-500/10 px-10 text-lg font-semibold text-red-50 transition-transform transition-colors duration-300 hover:-translate-y-1 hover:bg-red-500/20 focus-visible:-translate-y-1 focus-visible:ring-2 focus-visible:ring-red-300 md:ml-6 animate-fade-in-scale"
+                onClick={handleReset}
+              >
+                Reset
+              </Button>
             </div>
+            <label className="flex items-center gap-2 text-sm font-medium text-white/90">
+              <input
+                type="checkbox"
+                className="size-4 accent-white"
+                checked={hideOnStart}
+                onChange={(event) => setHideOnStart(event.target.checked)}
+              />
+              Hide timer on start
+            </label>
           </section>
 
           <section className="w-full max-w-xl flex-1 rounded-3xl border border-white/35 bg-white/90 p-7 text-left text-slate-900 shadow-2xl backdrop-blur-md">
