@@ -1,103 +1,626 @@
-import Image from "next/image";
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+const DEFAULT_DURATION_SECONDS = 2 * 60;
+
+function formatTime(totalSeconds: number) {
+  const sign = totalSeconds < 0 ? "-" : "";
+  const absSeconds = Math.abs(totalSeconds);
+  const minutes = Math.floor(absSeconds / 60);
+  const seconds = absSeconds % 60;
+
+  return `${sign}${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatDurationLabel(seconds: number) {
+  const absSeconds = Math.max(0, seconds);
+  const minutes = Math.floor(absSeconds / 60);
+  const remainder = absSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+type ColorKey = "emerald" | "yellow" | "orange" | "red";
+
+type ColorTheme = {
+  name: string;
+  swatch: string;
+  ring: string;
+  background: string;
+  baseText: string;
+  timer: string;
+  labelTone: string;
+  button: string;
+  rowBg: string;
+  rowBorder: string;
+};
+
+const COLOR_PRESETS: Record<ColorKey, ColorTheme> = {
+  emerald: {
+    name: "Emerald",
+    swatch: "bg-emerald-500",
+    ring: "ring-emerald-200",
+    background: "bg-emerald-500",
+    baseText: "text-emerald-50",
+    timer: "text-white",
+    labelTone: "text-emerald-100/80",
+    button: "bg-emerald-400/40 text-emerald-50 hover:bg-emerald-400/60 border border-emerald-50/40",
+    rowBg: "bg-emerald-50",
+    rowBorder: "border-emerald-200",
+  },
+  yellow: {
+    name: "Yellow",
+    swatch: "bg-yellow-400",
+    ring: "ring-yellow-200",
+    background: "bg-yellow-400",
+    baseText: "text-slate-950",
+    timer: "text-slate-950",
+    labelTone: "text-slate-900/70",
+    button: "bg-white/30 text-slate-950 hover:bg-white/40 border border-slate-900/20",
+    rowBg: "bg-yellow-50",
+    rowBorder: "border-yellow-200",
+  },
+  orange: {
+    name: "Orange",
+    swatch: "bg-orange-500",
+    ring: "ring-orange-200",
+    background: "bg-orange-500",
+    baseText: "text-orange-50",
+    timer: "text-white",
+    labelTone: "text-orange-100/80",
+    button: "bg-orange-400/50 text-orange-50 hover:bg-orange-400/70 border border-orange-50/40",
+    rowBg: "bg-orange-50",
+    rowBorder: "border-orange-200",
+  },
+  red: {
+    name: "Red",
+    swatch: "bg-red-600",
+    ring: "ring-red-200",
+    background: "bg-red-600",
+    baseText: "text-red-50",
+    timer: "text-white",
+    labelTone: "text-red-100/80",
+    button: "bg-red-500/50 text-red-50 hover:bg-red-500/70 border border-red-50/40",
+    rowBg: "bg-red-50",
+    rowBorder: "border-red-200",
+  },
+};
+
+const COLOR_OPTIONS = (Object.entries(COLOR_PRESETS) as Array<[ColorKey, ColorTheme]>).map(
+  ([key, value]) => ({
+    key,
+    name: value.name,
+    swatch: value.swatch,
+    ring: value.ring,
+  }),
+);
+
+type StageConfig = {
+  id: string;
+  minSeconds: number;
+  color: ColorKey;
+};
+
+type OvertimeConfig = {
+  label: string;
+  color: ColorKey;
+};
+
+const DEFAULT_SEGMENTS: StageConfig[] = [
+  {
+    id: "green",
+    minSeconds: 61,
+    color: "emerald",
+  },
+  {
+    id: "yellow",
+    minSeconds: 31,
+    color: "yellow",
+  },
+  {
+    id: "orange",
+    minSeconds: 0,
+    color: "orange",
+  },
+];
+
+const DEFAULT_OVERTIME: OvertimeConfig = {
+  label: "Overtime",
+  color: "red",
+};
+
+const SORT_SEGMENTS = (segments: StageConfig[]) =>
+  [...segments].sort((a, b) => b.minSeconds - a.minSeconds);
+
+function describeSegment(sorted: StageConfig[], index: number) {
+  const current = sorted[index];
+  if (!current) {
+    return "";
+  }
+
+  const prev = index > 0 ? sorted[index - 1] : undefined;
+
+  if (current.minSeconds <= 0) {
+    if (prev) {
+      return `< ${formatDurationLabel(prev.minSeconds)}`;
+    }
+    return "00:00";
+  }
+
+  if (!prev) {
+    return `≥ ${formatDurationLabel(current.minSeconds)}`;
+  }
+
+  const upperBound = prev.minSeconds - 1;
+
+  if (upperBound < current.minSeconds) {
+    return `≥ ${formatDurationLabel(current.minSeconds)}`;
+  }
+
+  return `≥ ${formatDurationLabel(current.minSeconds)}`;
+}
+
+function getActivePalette(
+  secondsRemaining: number,
+  segments: StageConfig[],
+  overtime: OvertimeConfig,
+) {
+  if (secondsRemaining < 0) {
+    const theme = COLOR_PRESETS[overtime.color];
+    return {
+      label: overtime.label,
+      theme,
+    };
+  }
+
+  const sorted = segments.length ? SORT_SEGMENTS(segments) : DEFAULT_SEGMENTS;
+  let matchIndex = sorted.findIndex((segment) => secondsRemaining >= segment.minSeconds);
+  if (matchIndex === -1) {
+    matchIndex = sorted.length - 1;
+  }
+  const chosen = sorted[matchIndex];
+  const theme = COLOR_PRESETS[chosen.color];
+  const label = describeSegment(sorted, matchIndex);
+
+  return {
+    label,
+    theme,
+  };
+}
+
+function generateId() {
+  return `segment-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [initialDuration, setInitialDuration] = useState(DEFAULT_DURATION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(DEFAULT_DURATION_SECONDS);
+  const [isRunning, setIsRunning] = useState(false);
+  const [minutesInput, setMinutesInput] = useState("2");
+  const [secondsInput, setSecondsInput] = useState("0");
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [isTimerHidden, setIsTimerHidden] = useState(false);
+  const [segments, setSegments] = useState<StageConfig[]>(DEFAULT_SEGMENTS);
+  const [overtime, setOvertime] = useState<OvertimeConfig>(DEFAULT_OVERTIME);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+  useEffect(() => {
+    if (!isRunning) {
+      return;
+    }
+
+    const tick = window.setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => {
+      window.clearInterval(tick);
+    };
+  }, [isRunning]);
+
+  const sortedSegments = useMemo(() => SORT_SEGMENTS(segments), [segments]);
+  const palette = useMemo(
+    () => getActivePalette(timeLeft, sortedSegments, overtime),
+    [timeLeft, sortedSegments, overtime],
+  );
+  const formatted = useMemo(() => formatTime(timeLeft), [timeLeft]);
+  const overtimeTheme = COLOR_PRESETS[overtime.color];
+
+  const handleToggle = () => {
+    setIsRunning((prev) => !prev);
+  };
+
+  const handleReset = () => {
+    setIsRunning(false);
+    setTimeLeft(initialDuration);
+    setIsTimerHidden(false);
+  };
+
+  const handleApplyDuration = () => {
+    const minutes = Number.parseInt(minutesInput, 10);
+    const seconds = Number.parseInt(secondsInput, 10);
+
+    if (Number.isNaN(minutes) || Number.isNaN(seconds)) {
+      setInputError("Enter whole numbers for minutes and seconds.");
+      return;
+    }
+
+    if (seconds < 0 || seconds > 59) {
+      setInputError("Seconds must be between 0 and 59.");
+      return;
+    }
+
+    const totalSeconds = minutes * 60 + seconds;
+
+    if (totalSeconds <= 0) {
+      setInputError("Duration must be more than zero seconds.");
+      return;
+    }
+
+    setInputError(null);
+    setInitialDuration(totalSeconds);
+    setTimeLeft(totalSeconds);
+    setIsRunning(false);
+    setIsTimerHidden(false);
+  };
+
+  const handleKeySubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    handleApplyDuration();
+  };
+
+  const updateSegment = (id: string, patch: Partial<StageConfig>) => {
+    setSegments((prev) => {
+      const next = prev.map((segment) => (segment.id === id ? { ...segment, ...patch } : segment));
+      return SORT_SEGMENTS(next);
+    });
+  };
+
+  const updateSegmentMinutes = (id: string, rawValue: string) => {
+    const parsedMinutes = Number.parseInt(rawValue, 10);
+    const minutes = Number.isNaN(parsedMinutes) ? 0 : Math.max(0, parsedMinutes);
+
+    setSegments((prev) => {
+      const next = prev.map((segment) => {
+        if (segment.id !== id || segment.minSeconds === 0) {
+          return segment;
+        }
+
+        const seconds = segment.minSeconds % 60;
+        return {
+          ...segment,
+          minSeconds: minutes * 60 + seconds,
+        };
+      });
+
+      return SORT_SEGMENTS(next);
+    });
+  };
+
+  const updateSegmentSeconds = (id: string, rawValue: string) => {
+    const parsedSeconds = Number.parseInt(rawValue, 10);
+    if (Number.isNaN(parsedSeconds)) {
+      return;
+    }
+
+    const seconds = Math.min(59, Math.max(0, parsedSeconds));
+
+    setSegments((prev) => {
+      const next = prev.map((segment) => {
+        if (segment.id !== id || segment.minSeconds === 0) {
+          return segment;
+        }
+
+        const minutes = Math.floor(segment.minSeconds / 60);
+        return {
+          ...segment,
+          minSeconds: minutes * 60 + seconds,
+        };
+      });
+
+      return SORT_SEGMENTS(next);
+    });
+  };
+
+  const removeSegment = (id: string) => {
+    setSegments((prev) => prev.filter((segment) => segment.id !== id));
+  };
+
+  const addSegment = () => {
+    setSegments((prev) => {
+      const candidateMin = Math.max(1, Math.floor(initialDuration / (prev.length + 2)));
+      const nextSegment: StageConfig = {
+        id: generateId(),
+        minSeconds: candidateMin,
+        color: "emerald",
+      };
+      return SORT_SEGMENTS([...prev, nextSegment]);
+    });
+  };
+
+  return (
+    <main
+      className={cn(
+        "relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 py-10 transition-colors duration-500",
+        palette.theme.background,
+        palette.theme.baseText,
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-10 [mask-image:radial-gradient(circle_at_center,black,transparent)]" />
+
+      <div
+        className={cn(
+          "relative z-[1] flex w-full max-w-6xl gap-8 transition-all duration-500",
+          isRunning ? "flex-col items-center" : "flex-col items-center lg:flex-row lg:items-stretch lg:justify-center",
+        )}
+      >
+        <section className="relative flex flex-1 min-w-[300px] flex-col gap-4 rounded-3xl border border-white/25 bg-black/20 p-8 text-center lg:flex-[1.4] lg:min-w-[420px] lg:p-12">
+          <div className="absolute left-5 top-5 flex flex-col gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-black/60 text-white hover:bg-black/70"
+              onClick={handleReset}
+            >
+              Reset
+            </Button>
+            {!isTimerHidden && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-black/60 text-white hover:bg-black/70"
+                onClick={handleToggle}
+              >
+                {isRunning ? "Pause" : "Start"}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-black/60 text-white hover:bg-black/70"
+              onClick={() => setIsTimerHidden((prev) => !prev)}
+            >
+              {isTimerHidden ? "Show" : "Hide"}
+            </Button>
+          </div>
+
+          <div className="flex flex-1 items-center justify-center">
+            {!isTimerHidden && (
+              <span
+                className={cn(
+                  "font-mono font-semibold leading-none",
+                  "text-[clamp(4rem,16vw,14rem)]",
+                  palette.theme.timer,
+                )}
+              >
+                {formatted}
+              </span>
+            )}
+          </div>
+
+          {!isRunning && !isTimerHidden && (
+            <form
+              onSubmit={handleKeySubmit}
+              className="grid w-full gap-4 rounded-2xl border border-white/25 bg-white/10 p-6 text-left backdrop-blur-sm sm:grid-cols-[repeat(3,minmax(0,1fr))]"
+            >
+              <label className="flex flex-col gap-2 text-sm font-semibold">
+                Minutes
+                <Input
+                  inputMode="numeric"
+                  pattern="\\d*"
+                  value={minutesInput}
+                  onChange={(event) => setMinutesInput(event.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="2"
+                  className="bg-white/80 text-slate-950 placeholder:text-slate-500"
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm font-semibold">
+                Seconds
+                <Input
+                  inputMode="numeric"
+                  pattern="\\d*"
+                  value={secondsInput}
+                  onChange={(event) => setSecondsInput(event.target.value.replace(/[^0-9]/g, ""))}
+                  placeholder="0"
+                  className="bg-white/80 text-slate-950 placeholder:text-slate-500"
+                />
+              </label>
+              <div className="flex items-end">
+                <Button type="submit" className="w-full" variant="secondary">
+                  Apply
+                </Button>
+              </div>
+              {inputError && (
+                <p className="col-span-full text-sm font-medium text-destructive">{inputError}</p>
+              )}
+            </form>
+          )}
+        </section>
+
+        {!isRunning && (
+          <section className="w-full max-w-xl flex-1 rounded-3xl border border-white/35 bg-white/90 p-7 text-left text-slate-900 shadow-2xl backdrop-blur-md">
+            <div className="flex h-full flex-col gap-5">
+              <header className="flex flex-col gap-2">
+                <h2 className="text-2xl font-semibold">Timer settings</h2>
+                <p className="text-sm text-slate-600">
+                  Configure the countdown, tweak colour stages, and choose the overtime palette without leaving this page.
+                </p>
+              </header>
+
+              <form onSubmit={handleKeySubmit} className="grid gap-4 rounded-2xl bg-white p-5 sm:grid-cols-[repeat(3,minmax(0,1fr))]">
+                <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                  Minutes
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={minutesInput}
+                    onChange={(event) => setMinutesInput(event.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="2"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-semibold text-slate-700">
+                  Seconds
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={59}
+                    value={secondsInput}
+                    onChange={(event) => setSecondsInput(event.target.value.replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <Button type="submit" className="w-full">
+                    Apply
+                  </Button>
+                </div>
+                {inputError && (
+                  <p className="col-span-full text-sm font-medium text-red-600">{inputError}</p>
+                )}
+              </form>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-slate-900">Colour stages</h3>
+                  <Button type="button" variant="outline" onClick={addSegment}>
+                    Add stage
+                  </Button>
+                </div>
+                <div className="space-y-3 overflow-x-hidden overflow-y-auto rounded-2xl bg-white/80 p-2 shadow-inner lg:max-h-[24rem]">
+                  {sortedSegments.map((segment, index) => {
+                    const isBaseStage = segment.minSeconds === 0;
+                    const rangeLabel = describeSegment(sortedSegments, index);
+                    const segmentTheme = COLOR_PRESETS[segment.color];
+
+                    return (
+                      <div
+                        key={segment.id}
+                        className={cn(
+                          "flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border px-4 py-3 shadow-sm",
+                          segmentTheme.rowBg,
+                          segmentTheme.rowBorder,
+                        )}
+                      >
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Time left</span>
+                          <span>{rangeLabel}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <span>Threshold</span>
+                          <div className="flex items-center gap-2 text-xs font-normal normal-case text-slate-600">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={Math.floor(segment.minSeconds / 60)}
+                              disabled={isBaseStage}
+                              onChange={(event) => updateSegmentMinutes(segment.id, event.target.value)}
+                              className="h-9 w-16 text-sm disabled:cursor-not-allowed"
+                            />
+                            <span className="text-xs font-medium text-slate-500">min</span>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={59}
+                              value={segment.minSeconds % 60}
+                              disabled={isBaseStage}
+                              onChange={(event) => updateSegmentSeconds(segment.id, event.target.value)}
+                              className="h-9 w-16 text-sm disabled:cursor-not-allowed"
+                            />
+                            <span className="text-xs font-medium text-slate-500">sec</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Colour</span>
+                          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap rounded-full bg-white/85 px-2 py-1 shadow-inner">
+                            {COLOR_OPTIONS.map((option) => {
+                              const isSelected = option.key === segment.color;
+
+                              return (
+                                <button
+                                  key={option.key}
+                                  type="button"
+                                  onClick={() => updateSegment(segment.id, { color: option.key })}
+                                  className={cn(
+                                    "size-8 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                                    option.swatch,
+                                    option.ring,
+                                    isSelected
+                                      ? "border-black/70 ring-offset-white"
+                                      : "border-white/70 opacity-80 hover:opacity-100",
+                                  )}
+                                  aria-label={`Use ${option.name} palette`}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {!isBaseStage && sortedSegments.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeSegment(segment.id)}
+                            className="ml-auto text-slate-500 hover:text-red-500"
+                          >
+                            Remove
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div
+                    className={cn(
+                      "flex flex-wrap items-center gap-x-5 gap-y-2 rounded-2xl border px-4 py-3 shadow-sm",
+                      overtimeTheme.rowBg,
+                      overtimeTheme.rowBorder,
+                    )}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Overtime</span>
+                      <Input
+                        value={overtime.label}
+                        onChange={(event) => setOvertime((prev) => ({ ...prev, label: event.target.value }))}
+                        className="h-9 w-36 text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Colour</span>
+                      <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap rounded-full bg-white/85 px-2 py-1 shadow-inner">
+                        {COLOR_OPTIONS.map((option) => {
+                          const isSelected = option.key === overtime.color;
+
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => setOvertime((prev) => ({ ...prev, color: option.key }))}
+                              className={cn(
+                                "size-8 rounded-full border-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                                option.swatch,
+                                option.ring,
+                                isSelected
+                                  ? "border-black/70 ring-offset-white"
+                                  : "border-white/70 opacity-80 hover:opacity-100",
+                              )}
+                              aria-label={`Use ${option.name} palette`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
+    </main>
   );
 }
